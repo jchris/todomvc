@@ -8,7 +8,7 @@
     serializeHasMany: function(record, json, relationship) {
       var key = relationship.key;
       var payloadKey = this.keyForRelationship ? this.keyForRelationship(key, "hasMany") : key;
-      var relationshipType = DS.RelationshipChange.determineRelationshipType(record.constructor, relationship);
+      var relationshipType = record.constructor.determineRelationshipType(relationship);
 
       if (relationshipType === 'manyToNone' ||
           relationshipType === 'manyToMany' ||
@@ -92,7 +92,30 @@
 
   });
 
-  DS.LSAdapter = DS.Adapter.extend(Ember.Evented, {
+  function advice(obj){
+    console.log("advice!", obj)
+
+    var keys = ["find",
+    "createRecord",
+    "updateRecord",
+    "deleteRecord",
+    "findAll",
+    "findQuery",
+    "findMany"];
+
+    keys.forEach(function (name) {
+      console.log("setup", name)
+      var old = obj[name];
+      if (!old) return;
+      obj[name] = function(){
+        console.log("data", name, arguments)
+        return old.apply(this, arguments)
+      }
+    })
+    return obj;
+  }
+
+  DS.LSAdapter = DS.Adapter.extend(Ember.Evented, advice({
     /**
       This is the main entry point into finding records. The first parameter to
       this method is the model's name as a string.
@@ -220,12 +243,14 @@
       for (var id in namespace.records) {
         results.push(Ember.copy(namespace.records[id]));
       }
+      console.log("findAll", results)
       return Ember.RSVP.resolve(results);
     },
 
     createRecord: function (store, type, record) {
       var namespaceRecords = this._namespaceForType(type);
       var recordHash = record.serialize({includeId: true});
+      console.log("createRecord", recordHash)
 
       namespaceRecords.records[recordHash.id] = recordHash;
 
@@ -238,7 +263,7 @@
       var id = record.get('id');
 
       namespaceRecords.records[id] = record.serialize({ includeId: true });
-
+      console.log("record", namespaceRecords.records[id])
       this.persistData(type, namespaceRecords);
       return Ember.RSVP.resolve();
     },
@@ -507,5 +532,5 @@
         return relationships;
       }
     }
-  });
+  }));
 }());
